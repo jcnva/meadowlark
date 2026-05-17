@@ -225,14 +225,33 @@ if uploaded_files:
             df_display[['Date', 'Locality', 'Checklists']],
             hide_index=True,
             height=527,
-            selection_mode="single-row",
+            selection_mode="multi-row",
             on_select="rerun"
         )
 
-        selected_locality = None
+        selected_localities = []
+
         if table_event.selection.rows:
-            selected_idx = table_event.selection.rows[0]
-            selected_locality = df_display.iloc[selected_idx]['Locality']
+
+            selected_localities = (
+                df_display
+                .iloc[
+                    table_event.selection.rows
+                ]["Locality"]
+                .tolist()
+            )
+
+        # Filter all analytics + map
+        if selected_localities:
+
+            df_filtered = df_unique[
+                df_unique["Locality"].isin(
+                    selected_localities
+                )
+            ]
+
+        else:
+            df_filtered = df_unique
 
     # --- Analytics Charts ---
     chart_col1, chart_col2 = st.columns(2)
@@ -240,7 +259,7 @@ if uploaded_files:
         st.subheader("Observation History", help=txt_chart1, anchor=False)
 
         timeline_data = (
-            df_unique.groupby(df_unique['Date_obj'].dt.date)['eBird Checklist ID']
+            df_filtered.groupby(df_unique['Date_obj'].dt.date)['eBird Checklist ID']
             .nunique()
             .reset_index()
         )
@@ -251,6 +270,7 @@ if uploaded_files:
             y=alt.Y('Checklists:Q', title='Checklists', axis=alt.Axis(format='d')),
             tooltip=['Date:T', 'Checklists:Q']
         ).properties(height=250).interactive(bind_y=False)
+
         st.altair_chart(history_chart, width='stretch')
 
     with chart_col2:
@@ -260,8 +280,8 @@ if uploaded_files:
         def map_to_seasonal_calendar(dt):
             return dt.replace(year=2000)
 
-        df_unique['Seasonal_Date'] = df_unique['Date_obj'].apply(map_to_seasonal_calendar)
-        counts = df_unique.groupby('Seasonal_Date')['eBird Checklist ID'].nunique()
+        df_filtered['Seasonal_Date'] = df_unique['Date_obj'].apply(map_to_seasonal_calendar)
+        counts = df_filtered.groupby('Seasonal_Date')['eBird Checklist ID'].nunique()
         calendar_index = pd.date_range(start="2000-01-01", end="2000-12-31")
         seasonal_series = counts.reindex(calendar_index, fill_value=0)
         seasonal_df = pd.DataFrame({"Date": seasonal_series.index, "Checklists": seasonal_series.values})
@@ -292,9 +312,7 @@ if uploaded_files:
 
     # --- Map ---
     with map_col:
-        def render_map(data, selected_locality=None):
-            if selected_locality:
-                data = data[data['Locality'] == selected_locality]
+        def render_map(data):
 
             m = folium.Map()
 
@@ -414,7 +432,7 @@ if uploaded_files:
         # Render the map
         with st.spinner("Rendering map..."):
             st_folium(
-                render_map(df_unique, selected_locality),
+                render_map(df_filtered),
                 width="100%",
                 height=550,
                 key="bird_map_v14",
