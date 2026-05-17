@@ -255,7 +255,8 @@ if uploaded_files:
 
     # --- Analytics Charts ---
     chart_col1, chart_col2 = st.columns(2)
-    with chart_col1:
+
+    with chart_col2:
         st.subheader("Observation History", help=txt_chart1, anchor=False)
 
         timeline_data = (
@@ -266,14 +267,24 @@ if uploaded_files:
         timeline_data.columns = ['Date', 'Checklists']
 
         history_chart = alt.Chart(timeline_data).mark_bar(color="#2E86C1").encode(
-            x=alt.X('Date:T', title=None),
+            x=alt.X(
+                "Date:T",
+                axis=alt.Axis(
+                    format="%Y",
+                    tickCount="year",
+                    grid=True,
+                    gridColor="#E5E8E8",
+                    labelAngle=0,
+                    title="Year",
+                ),
+            ),
             y=alt.Y('Checklists:Q', title='Checklists', axis=alt.Axis(format='d')),
             tooltip=['Date:T', 'Checklists:Q']
         ).properties(height=250).interactive(bind_y=False)
 
         st.altair_chart(history_chart, width='stretch')
 
-    with chart_col2:
+    with chart_col1:
         st.subheader("Seasonal Activity", help=txt_chart2, anchor=False)
 
         # Map dates to a fixed year to show seasonal patterns
