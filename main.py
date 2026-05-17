@@ -11,14 +11,14 @@ from datetime import datetime
 txt_file = """
 Upload your Macaulay Library Catalog File here.
 
-1. Log into eBird*
+1. Sign into eBird*
 2. Visit the Macaulay Library using the above link. (http://media.ebird.org or http://search.macaulaylibrary.org)
 3. Search for a species
 4. Apply any desired filters such as Location, Date, etc. (Highly recommend sorting by Date: Newest First)
 5. Click the 'Export' button at the upper right of the page to download the CSV file.
 6. Upload the CSV file here.
 
-\\* Being logged into eBird allows retrieval of up to 10,000 rows. Otherwise, it is limited to whatever is displayed on the page.
+\\* Being signed into eBird allows retrieval of up to 10,000 rows. Otherwise, it is limited to whatever is displayed on the page.
 """
 
 txt_table = """
@@ -168,31 +168,43 @@ def load_data(files):
     return df, df_unique
 
 
-# --- Sidebar ---
+# --- Sidebar Setup ---
 with st.sidebar:
     st.title("Meadowlark")
     st.link_button("Open Macaulay Library", "https://search.macaulaylibrary.org")
-    uploaded_files = st.file_uploader("Upload your ML Catalog CSV file", type=["csv"], help=txt_file,accept_multiple_files=True)
+    uploaded_files = st.file_uploader("Upload your ML Catalog CSV file", type=["csv"], help=txt_file, accept_multiple_files=True)
 
 if uploaded_files:
     try:
         df_full, df_unique = load_data(uploaded_files)
-    except ValueError as e:
-        st.error(str(e))
-        st.stop()
-
-    # Metrics
-    st.sidebar.metric("Total Media Assets", len(df_full))
-    st.sidebar.metric("Unique Checklists", len(df_unique))
-    st.header(df_full['Common Name'].iloc[0], anchor=False)
-
-    # --- Recent Observations ---
-    list_col, map_col = st.columns([1, 1])
-    with list_col:
-        st.subheader("Recent Activity by Location", help=txt_table, anchor=False)
-
         now = pd.Timestamp.now().normalize()
 
+        # Define hierarchy options and weight map for "up-only" comparison
+        recency_options = ["Past 7 Days", "Past 30 Days", "Past 90 Days", "All Time"]
+        recency_weights = {opt: i for i, opt in enumerate(recency_options)}
+
+        # --- 2. Calculate Table Data & Handle Global Reset ---
+        current_file_signature = tuple(sorted(f.name for f in uploaded_files))
+        
+        if "uploaded_signature" not in st.session_state or st.session_state.uploaded_signature != current_file_signature:
+            st.session_state.uploaded_signature = current_file_signature
+            st.session_state.prev_selection = []
+            if "loc_table" in st.session_state:
+                del st.session_state["loc_table"]
+
+            # Initialize map recency from newest observation in whole dataset
+            newest_global = df_unique['Date_obj'].max()
+            global_days_old = (now - newest_global.normalize()).days
+            if global_days_old <= 7:
+                st.session_state.map_recency = "Past 7 Days"
+            elif global_days_old <= 30:
+                st.session_state.map_recency = "Past 30 Days"
+            elif global_days_old <= 90:
+                st.session_state.map_recency = "Past 90 Days"
+            else:
+                st.session_state.map_recency = "All Time"
+
+        # Pre-calculate table dataframe for row selection mapping
         df_recent = (
             df_unique
             .groupby('Locality', as_index=False)
@@ -218,40 +230,82 @@ if uploaded_files:
 
         if not df_display.empty:
             df_display['Date'] = df_display['Newest_Checklist'].dt.strftime('%Y-%m-%d')
-        else:
-            st.warning("No checklists to display for the selected data.")
 
-        table_event = st.dataframe(
-            df_display[['Date', 'Locality', 'Checklists']],
-            hide_index=True,
-            height=527,
-            selection_mode="multi-row",
-            on_select="rerun"
-        )
+        # --- 3. Read Selection State (Before rendering UI) ---
+        current_selection = []
+        if "loc_table" in st.session_state:
+            current_selection = st.session_state.loc_table.get("selection", {}).get("rows", [])
+
+        if "prev_selection" not in st.session_state:
+            st.session_state.prev_selection = []
+
+        selection_changed = current_selection != st.session_state.prev_selection
+        st.session_state.prev_selection = current_selection
 
         selected_localities = []
+        if current_selection:
+            selected_localities = df_display.iloc[current_selection]["Locality"].tolist()
 
-        if table_event.selection.rows:
-
-            selected_localities = (
-                df_display
-                .iloc[
-                    table_event.selection.rows
-                ]["Locality"]
-                .tolist()
-            )
-
-        # Filter all analytics + map
         if selected_localities:
+            df_filtered = df_unique[df_unique["Locality"].isin(selected_localities)]
 
-            df_filtered = df_unique[
-                df_unique["Locality"].isin(
-                    selected_localities
-                )
-            ]
+            # If the selection changed, conditionally expand the slider window UP
+            if selection_changed:
+                # Find the oldest date among the currently selected table rows
+                oldest_selected_date = df_display.iloc[current_selection]['Newest_Checklist'].min()
+                days_old = (now - oldest_selected_date.normalize()).days
+
+                if days_old <= 7:
+                    required_recency = "Past 7 Days"
+                elif days_old <= 30:
+                    required_recency = "Past 30 Days"
+                elif days_old <= 90:
+                    required_recency = "Past 90 Days"
+                else:
+                    required_recency = "All Time"
+
+                current_recency = st.session_state.get("map_recency", "Past 7 Days")
+                
+                # STRICT RULE: Only adjust the target index up, never down.
+                if recency_weights[required_recency] > recency_weights[current_recency]:
+                    st.session_state.map_recency = required_recency
 
         else:
             df_filtered = df_unique
+
+    except ValueError as e:
+        st.error(str(e))
+        st.stop()
+
+    # --- 4. Render Metrics & Widgets ---
+    st.sidebar.metric("Total Media Assets", len(df_full))
+    st.sidebar.metric("Unique Checklists", len(df_unique))
+    st.sidebar.subheader("Map Controls")
+    st.sidebar.select_slider(
+        "Display Markers by Recency",
+        options=recency_options,
+        key="map_recency",
+        help="Filter the locations shown on the map based on the checklist date."
+    )
+
+    # --- 5. Main Content Area ---
+    st.header(df_full['Common Name'].iloc[0], anchor=False)
+
+    map_col, list_col = st.columns([1, 1])
+    with list_col:
+        st.subheader("Recent Activity by Location", help=txt_table, anchor=False)
+
+        if not df_display.empty:
+            st.dataframe(
+                df_display[['Date', 'Locality', 'Checklists']],
+                hide_index=True,
+                height=527,
+                selection_mode="multi-row",
+                on_select="rerun",
+                key="loc_table" 
+            )
+        else:
+            st.warning("No checklists to display for the selected data.")
 
     # --- Analytics Charts ---
     chart_col1, chart_col2 = st.columns(2)
@@ -266,6 +320,14 @@ if uploaded_files:
         )
         timeline_data.columns = ['Date', 'Checklists']
 
+        min_year = timeline_data['Date'].min().year
+        max_year = timeline_data['Date'].max().year
+
+        if min_year == max_year:
+            year_title = f"Year ({min_year})"
+        else:
+            year_title = f"Years ({min_year}–{max_year})"
+
         history_chart = alt.Chart(timeline_data).mark_bar(color="#2E86C1").encode(
             x=alt.X(
                 "Date:T",
@@ -275,7 +337,7 @@ if uploaded_files:
                     grid=True,
                     gridColor="#E5E8E8",
                     labelAngle=0,
-                    title="Year",
+                    title=year_title,
                 ),
             ),
             y=alt.Y('Checklists:Q', title='Checklists', axis=alt.Axis(format='d')),
@@ -287,7 +349,6 @@ if uploaded_files:
     with chart_col1:
         st.subheader("Seasonal Activity", help=txt_chart2, anchor=False)
 
-        # Map dates to a fixed year to show seasonal patterns
         def map_to_seasonal_calendar(dt):
             return dt.replace(year=2000)
 
@@ -323,6 +384,17 @@ if uploaded_files:
 
     # --- Map ---
     with map_col:
+        
+        # Apply Slider Filter for Map bounds
+        if st.session_state.map_recency == "Past 7 Days":
+            df_map = df_filtered[df_filtered['Date_obj'] >= (now - pd.Timedelta(days=7))]
+        elif st.session_state.map_recency == "Past 30 Days":
+            df_map = df_filtered[df_filtered['Date_obj'] >= (now - pd.Timedelta(days=30))]
+        elif st.session_state.map_recency == "Past 90 Days":
+            df_map = df_filtered[df_filtered['Date_obj'] >= (now - pd.Timedelta(days=90))]
+        else:
+            df_map = df_filtered
+            
         def render_map(data):
 
             m = folium.Map()
@@ -367,7 +439,6 @@ if uploaded_files:
             folium.FitOverlays().add_to(m)
 
             for _, row in data.iterrows():
-                # Only generate thumbnail if Format is Photo
                 if row.get('Format') == "Photo":
                     catalog_id = row['ML Catalog Number']
                     thumbnail_url = f"https://cdn.download.ams.birds.cornell.edu/api/v2/asset/{catalog_id}/160"
@@ -382,9 +453,7 @@ if uploaded_files:
                     <b>Observation Details:</b>
                     {row['Observation Details']}<br>
                     """
-                    if contains_coordinates(
-                        row['Observation Details']
-                    ):
+                    if contains_coordinates(row['Observation Details']):
                         icon = 'compass'
                     else:
                         icon = 'comment'
@@ -396,6 +465,7 @@ if uploaded_files:
                     icon = 'volume-high'
                 else:
                     icon = ''
+                    
                 popup_html = f"""
                 <div style="font-family: sans-serif; font-size: 12px;">
                     {"<img src='" + thumbnail_url + "' style='width: 160px; border-radius: 8px; margin-bottom: 8px;' ><br>" if thumbnail_url else ""}
@@ -428,7 +498,7 @@ if uploaded_files:
 
             return m
 
-        # --- Map Legend ---
+        # Map Legend
         legend_html = """
         <div style="display:flex; gap:15px; margin-bottom:10px;">
             <div style="background-color:#e74c3c; width:20px; height:20px; display:inline-block;"></div> ≤ 7 days
@@ -437,13 +507,11 @@ if uploaded_files:
             <div style="background-color:#3498db; width:20px; height:20px; display:inline-block;"></div> > 90 days
         </div>
         """
-
         st.markdown(legend_html, unsafe_allow_html=True)
 
-        # Render the map
         with st.spinner("Rendering map..."):
             st_folium(
-                render_map(df_filtered),
+                render_map(df_map), 
                 width="100%",
                 height=550,
                 key="bird_map_v14",
