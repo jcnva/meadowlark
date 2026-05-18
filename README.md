@@ -2,7 +2,12 @@
 
 ## Overview
 
-Meadowlark is a Streamlit-based application designed for single-species study and analysis using observation data from the Macaulay Library. Users can upload CSV files exported from the Macaulay Library Catalog to investigate the distribution, seasonality, recency, and historical activity of an individual species through interactive maps, linked media, checklist exploration, and analytical visualizations.
+Meadowlark is a Streamlit-based application designed for single-species study and analysis using observation data from the Macaulay Library. It focuses on high-quality reports with media and useful comments, while presenting recency and map data in a more useful way than a regular eBird search. It is meant to quickly help find answers to questions like:
+"Where has this bird been photographed most recently/reliably?" ,
+"Is it worth chasing for photos, or is a scope required?" ,
+"What time of year should I go?",
+and
+"Just gimme the coordinates!"
 
 ## Features
 
@@ -11,8 +16,8 @@ Meadowlark is a Streamlit-based application designed for single-species study an
    - Multiple files are accepted so long as all files contain data for **only one species**.
 
 2. **Recent Observations Table**
-   - Displays the most recent localities with checklists OR all localities with checklists within the last 7 days.
-   - Allows selecting a locality to zoom in on the map.
+   - Displays localities sorted by date. It can also be sorted by Checklist count.
+   - Select a row or multiple rows to zoom in on the map.
 
 3. **Interactive Map**
    - Uses **Folium** for interactive map visualization.
@@ -22,7 +27,7 @@ Meadowlark is a Streamlit-based application designed for single-species study an
      - 31–90 days: <span style="color:green">Green</span>
      - \>90 days: <span style="color:blue">Blue</span>
 
-   - **Marker Icons** for comments and media types:
+   - **Marker Icons** for highlighting comments and media types:
 
      <img src="https://raw.githubusercontent.com/FortAwesome/Font-Awesome/7.x/svgs/solid/compass.svg" width="15" height="15"> Comment with Coordinates
 
@@ -40,14 +45,14 @@ Meadowlark is a Streamlit-based application designed for single-species study an
 
 ## How to Prepare an Input File
 
-1. Log into eBird*
+1. Sign into eBird*
 2. Visit the Macaulay Library. (http://media.ebird.org or http://search.macaulaylibrary.org)
 3. Search for a species
 4. Apply any desired filters such as Location, Date, etc. (**Highly recommend** sorting by **Date: Newest First**)
 5. Click the 'Export' button at the upper right of the page to download the CSV file
 6. Upload to Meadowlark
 
-\* Being logged into eBird allows retrieval of up to 10,000 rows. Otherwise, it is limited to whatever is displayed on the page.
+\* Being signed into eBird allows retrieval of up to 10,000 rows. Otherwise, it is limited to~ 30.
 
 ## Demo
 
