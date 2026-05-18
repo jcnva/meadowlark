@@ -22,11 +22,7 @@ Upload your Macaulay Library Catalog File here.
 """
 
 txt_table = """
-This table displays the greater of EITHER:
-
-a) All localities with a checklist within the past 7 days, OR
-b) The most recent 14 localities with a checklist
-
+This table displays all localities sorted by Date. It can be also be sorted by Checklist count.
 To zoom into a specific locality on the map, select the checkbox to the left of it.
 """
 
@@ -171,7 +167,7 @@ def load_data(files):
 # --- Sidebar Setup ---
 with st.sidebar:
     st.title("Meadowlark")
-    st.link_button("Open Macaulay Library", "https://search.macaulaylibrary.org")
+    st.link_button("🔎︎ Macaulay Library", "https://search.macaulaylibrary.org")
     uploaded_files = st.file_uploader("Upload your ML Catalog CSV file", type=["csv"], help=txt_file, accept_multiple_files=True)
 
 if uploaded_files:
@@ -204,8 +200,8 @@ if uploaded_files:
             else:
                 st.session_state.map_recency = "All Time"
 
-        # Pre-calculate table dataframe for row selection mapping
-        df_recent = (
+        # --- Pre-calculate table dataframe for ALL localities ---
+        df_display = (
             df_unique
             .groupby('Locality', as_index=False)
             .agg(
@@ -213,20 +209,8 @@ if uploaded_files:
                 Newest_Checklist=('Date_obj', 'max')
             )
             .sort_values(by='Newest_Checklist', ascending=False)
-            .head(14)
+            .reset_index(drop=True)
         )
-
-        df_week = (
-            df_unique[df_unique['Date_obj'] >= (now - pd.Timedelta(days=7))]
-            .groupby('Locality', as_index=False)
-            .agg(
-                Checklists=('eBird Checklist ID', 'nunique'),
-                Newest_Checklist=('Date_obj', 'max')
-            )
-            .sort_values(by='Newest_Checklist', ascending=False)
-        )
-
-        df_display = df_week if len(df_week) > len(df_recent) else df_recent
 
         if not df_display.empty:
             df_display['Date'] = df_display['Newest_Checklist'].dt.strftime('%Y-%m-%d')
@@ -288,21 +272,64 @@ if uploaded_files:
         help="Filter the locations shown on the map based on the checklist date."
     )
 
-    # --- 5. Main Content Area ---
+# --- 5. Main Content Area ---
     st.header(df_full['Common Name'].iloc[0], anchor=False)
 
     map_col, list_col = st.columns([1, 1])
     with list_col:
-        st.subheader("Recent Activity by Location", help=txt_table, anchor=False)
+        st.subheader("Activity by Location", help=txt_table, anchor=False)
 
         if not df_display.empty:
+            
+            # 1. Define the row styling function
+            def style_table_by_recency(row):
+                now = pd.Timestamp.now().normalize()
+                date = pd.to_datetime(row['Date'])
+                days_old = (now - date.normalize()).days
+                
+                # Match the map's marker colors but use rgba for background transparency
+                if days_old <= 7:
+                    color = '#e74c3c99'   # Red
+                elif days_old <= 30:
+                    color = '#f39c1299'  # Orange
+                elif days_old <= 90:
+                    color = '#27ae6099'   # Green
+                else:
+                    color = '#3498db99'  # Blue
+                    
+                return [f'background-color: {color}'] * len(row)
+
+            # 2. Apply the style to the subset of columns you want to display
+            styled_df = (
+                df_display[['Date', 'Checklists', 'Locality']]
+                .style.apply(style_table_by_recency, axis=1)
+            )
+
+            # 3. Pass the styled dataframe to st.dataframe
             st.dataframe(
-                df_display[['Date', 'Locality', 'Checklists']],
+                styled_df,
                 hide_index=True,
                 height=527,
                 selection_mode="multi-row",
                 on_select="rerun",
-                key="loc_table" 
+                key="loc_table",
+                column_config={
+                    "Date": st.column_config.Column(
+                        "Date",
+                        width="small",       # Forces a tight fit for YYYY-MM-DD
+                        required=True
+                    ),
+                    "Checklists": st.column_config.Column(
+                        "Checklists",
+                        width="small",       # Forces a tight fit for numbers
+                        required=True
+                    ),
+                    "Locality": st.column_config.Column(
+                        "Locality", 
+                        width="large"        # Gives Locality the priority layout space
+                    )
+                },
+                width = 'stretch'
             )
         else:
             st.warning("No checklists to display for the selected data.")
