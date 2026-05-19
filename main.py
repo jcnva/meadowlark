@@ -171,7 +171,7 @@ def load_data(files):
 # --- Sidebar Setup ---
 with st.sidebar:
     st.title("Meadowlark")
-    st.link_button("🔎︎ Macaulay Library", "https://search.macaulaylibrary.org")
+    st.link_button("🔎︎ Macaulay Library", "https://search.macaulaylibrary.org/catalog?sort=obs_date_desc")
     uploaded_files = st.file_uploader("Upload your ML Catalog CSV file", type=["csv"], help=txt_file, accept_multiple_files=True)
 
 if uploaded_files:
