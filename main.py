@@ -503,11 +503,24 @@ if uploaded_files:
             clean_df = data.rename(columns=lambda x: x.replace(' ', '_'))
             
             for row in clean_df.itertuples():
-                if getattr(row, 'Format', '') == "Photo":
-                    catalog_id = row.ML_Catalog_Number
-                    thumbnail_url = f"https://cdn.download.ams.birds.cornell.edu/api/v2/asset/{catalog_id}/160"
-                else:
-                    thumbnail_url = None
+                catalog_id = getattr(row, 'ML_Catalog_Number', '')
+                format_type = getattr(row, 'Format', '')
+                
+                popup_media_html = ""
+                tooltip_media_html = ""
+                
+                if pd.notna(catalog_id) and str(catalog_id).strip():
+                    thumbnail_url = f"https://cdn.download.ams.birds.cornell.edu/api/v2/asset/{catalog_id}"
+                    
+                    if format_type == "Photo":
+                        popup_media_html = f"<img src='{thumbnail_url}/160' style='width: 160px; border-radius: 8px; margin-bottom: 8px;' ><br>"
+                        tooltip_media_html = popup_media_html
+                        
+                    elif format_type == "Audio":
+                        popup_media_html = f"<audio controls style='width: 160px; height: 32px; margin-bottom: 8px;'><source src='{thumbnail_url}/mp3'>Your browser does not support audio.</audio><br>"
+                    elif format_type == "Video":
+                        popup_media_html = f"<video controls poster='{thumbnail_url}/mp4/1280' style='width: 160px; border-radius: 8px; margin-bottom: 8px;'><source src='{thumbnail_url}/mp4/1280'>Your browser does not support video.</video><br>"
+                        tooltip_media_html = f"<img src='{thumbnail_url}/160' style='width: 160px; border-radius: 8px; margin-bottom: 8px;' ><br>"
 
                 checklist_url = f"https://ebird.org/checklist/{row.eBird_Checklist_ID}"
                 observation_details = ""
@@ -522,18 +535,18 @@ if uploaded_files:
                     icon = 'compass'
                 elif row.icon_group == 'comment':
                     icon = 'comment'
-                elif getattr(row, 'Format', '') == 'Photo':
+                elif format_type == 'Photo':
                     icon = 'camera'
-                elif getattr(row, 'Format', '') == 'Video':
+                elif format_type == 'Video':
                     icon = 'video-camera'
-                elif getattr(row, 'Format', '') == 'Audio':
+                elif format_type == 'Audio':
                     icon = 'volume-high'
                 else:
                     icon = ''
                     
                 popup_html = f"""
                 <div style="font-family: sans-serif; font-size: 12px;">
-                    {"<img src='" + thumbnail_url + "' style='width: 160px; border-radius: 8px; margin-bottom: 8px;' ><br>" if thumbnail_url else ""}
+                    {popup_media_html}
                     <b style="font-size: 14px;">{row.Common_Name}</b><br>
                     <b>Locality:</b> {row.Locality}<br>
                     <b>Date:</b> {row.Date}<br>
@@ -543,9 +556,10 @@ if uploaded_files:
                     </a>
                 </div>
                 """
+                
                 tooltip_html = f"""
                 <div style="font-family: sans-serif; font-size: 12px; width: 160px; white-space: normal">
-                    {"<img src='" + thumbnail_url + "' style='width: 160px; border-radius: 8px; margin-bottom: 8px;' ><br>" if thumbnail_url else ""}
+                    {tooltip_media_html}
                     <b style="font-size: 14px;">{row.Common_Name}</b><br>
                     <b>Locality:</b> {row.Locality}<br>
                     <b>Date:</b> {row.Date}<br>
