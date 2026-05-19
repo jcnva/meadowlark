@@ -31,7 +31,7 @@ and
      - 🟠 8–30 days
      - 🟢 31–90 days
      - 🔵 \>90 days
-   - **Marker Icons** for highlighting comments and media types:
+   - **Marker Icons** highlight comments and media types:
      - 🧭 Comment with Coordinates
      - 💬 Comment
      - 📷 Photo
