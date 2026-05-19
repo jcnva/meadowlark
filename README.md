@@ -2,7 +2,7 @@
 
 ## Overview
 
-Meadowlark is a Streamlit-based application designed for single-species study and analysis using observation data from the Macaulay Library. It focuses on high-quality reports with media and useful comments, while presenting recency and map data in a more useful way than a regular eBird search. It is meant to quickly help find answers to questions like:
+Meadowlark is designed to help you find your next target species using observation data from the Macaulay Library. It parses high-quality checklists with media and comments, presenting recency and location data in a more accessible way than a regular eBird search. It is meant to quickly help find answers to questions like:
 "Where has this bird been photographed most recently/reliably?" ,
 "Is it worth chasing for photos, or is a scope required?" ,
 "What time of year should I go?",
@@ -13,7 +13,7 @@ and
 
 1. **Data Upload & Validation**
    - Accepts CSV files exported from Macaulay Library.
-   - Multiple files are accepted so long as all files contain data for **only one species**.
+   - Multiple files are accepted as long as all files contain data for **only one species**.
 
 2. **Recent Observations Table**
    - Displays localities sorted by date. It can also be sorted by Checklist count.
@@ -26,7 +26,6 @@ and
      - 8–30 days: <span style="color:orange">Orange</span>
      - 31–90 days: <span style="color:green">Green</span>
      - \>90 days: <span style="color:blue">Blue</span>
-
    - **Marker Icons** for highlighting comments and media types:
 
      <img src="https://raw.githubusercontent.com/FortAwesome/Font-Awesome/7.x/svgs/solid/compass.svg" width="15" height="15"> Comment with Coordinates
@@ -38,6 +37,9 @@ and
      <img src="https://raw.githubusercontent.com/FortAwesome/Font-Awesome/7.x/svgs/solid/video-camera.svg" width="15" height="15"> Video
 
      <img src="https://raw.githubusercontent.com/FortAwesome/Font-Awesome/7.x/svgs/solid/volume-high.svg" width="15" height="15"> Audio   
+   - **Marker Filters**
+     - Filter the locations shown on the map based on the checklist date.
+     - Show only checklists with comments, or coordinates in the comments. 
 
 4. **Analytics Charts**
    - **Observation History:** Shows checklist submissions over time.
