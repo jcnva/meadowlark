@@ -139,6 +139,16 @@ def load_data(files):
     df_unique['cluster_color'] = np.select(conditions, ['#e74c3c', '#f39c12', '#27ae60'], default='#3498db')
     df_unique['priority'] = np.select(conditions, [4, 3, 2], default=1)
     df_unique['Date'] = df_unique['Date_obj'].dt.strftime('%Y-%m-%d')
+    
+    # Map Checkbox Optimization: Pre-tag rows with their icon_group
+    def determine_icon_group(row):
+        if pd.notna(row['Observation Details']) and str(row['Observation Details']).strip() != "":
+            if contains_coordinates(row['Observation Details']):
+                return 'compass'
+            return 'comment'
+        return 'media_or_blank'
+
+    df_unique['icon_group'] = df_unique.apply(determine_icon_group, axis=1)
 
     # Cache df_display by moving it inside load_data
     df_display = (
@@ -172,6 +182,13 @@ if uploaded_files:
         # Define hierarchy options and weight map for "up-only" comparison
         recency_options = ["Past 7 Days", "Past 30 Days", "Past 90 Days", "All Time"]
         recency_weights = {opt: i for i, opt in enumerate(recency_options)}
+        
+        # Helper to convert days old to slider category
+        def get_recency_category(days):
+            if days <= 7: return "Past 7 Days"
+            if days <= 30: return "Past 30 Days"
+            if days <= 90: return "Past 90 Days"
+            return "All Time"
 
         # --- 2. Calculate Table Data & Handle Global Reset ---
         current_file_signature = tuple(sorted(f.name for f in uploaded_files))
@@ -185,15 +202,7 @@ if uploaded_files:
             # Initialize map recency from newest observation in whole dataset
             newest_global = df_unique['Date_obj'].max()
             global_days_old = (now - newest_global.normalize()).days
-            if global_days_old <= 7:
-                st.session_state.map_recency = "Past 7 Days"
-            elif global_days_old <= 30:
-                st.session_state.map_recency = "Past 30 Days"
-            elif global_days_old <= 90:
-                st.session_state.map_recency = "Past 90 Days"
-            else:
-                st.session_state.map_recency = "All Time"
-
+            st.session_state.map_recency = get_recency_category(global_days_old)
 
         # --- 3. Read Selection State (Before rendering UI) ---
         current_selection = []
@@ -218,16 +227,7 @@ if uploaded_files:
                 # Find the oldest date among the currently selected table rows
                 oldest_selected_date = df_display.iloc[current_selection]['Newest_Checklist'].min()
                 days_old = (now - oldest_selected_date.normalize()).days
-
-                if days_old <= 7:
-                    required_recency = "Past 7 Days"
-                elif days_old <= 30:
-                    required_recency = "Past 30 Days"
-                elif days_old <= 90:
-                    required_recency = "Past 90 Days"
-                else:
-                    required_recency = "All Time"
-
+                required_recency = get_recency_category(days_old)
                 current_recency = st.session_state.get("map_recency", "Past 7 Days")
                 
                 # Only adjust the target index up, never down.
@@ -386,15 +386,38 @@ if uploaded_files:
             if st.session_state.map_compass:
                 st.session_state.map_comments = True
 
+        # Checkbox Slider Auto-Expand Logic
+        compass_toggled_on = st.session_state.get("map_compass") and not st.session_state.get("prev_map_compass", False)
+        comments_toggled_on = st.session_state.get("map_comments") and not st.session_state.get("prev_map_comments", False)
+        
+        cb_subset = None
+        if compass_toggled_on:
+            cb_subset = df_filtered[df_filtered['icon_group'] == 'compass']
+        elif comments_toggled_on:
+            cb_subset = df_filtered[df_filtered['icon_group'].isin(['comment', 'compass'])]
+            
+        if cb_subset is not None and not cb_subset.empty:
+            newest_cb_date = cb_subset['Date_obj'].max()
+            days_old_cb = (now - newest_cb_date.normalize()).days
+            required_recency_cb = get_recency_category(days_old_cb)
+            
+            current_recency = st.session_state.get("map_recency", "Past 7 Days")
+            if recency_weights[required_recency_cb] > recency_weights[current_recency]:
+                st.session_state.map_recency = required_recency_cb
+
+        # Save current state for next run to ensure we only bump up on the initial click
+        st.session_state.prev_map_compass = st.session_state.get("map_compass", False)
+        st.session_state.prev_map_comments = st.session_state.get("map_comments", False)
+
         # --- Map Controls ---
         ctrl_col1, ctrl_col2, ctrl_col3 = st.columns([5, 1, 1], vertical_alignment="bottom")
         
         with ctrl_col1:
             st.select_slider(
-                "Display Markers by Recency",
+                "Show Checklists by Recency",
                 options=recency_options,
                 key="map_recency",
-                help="Filter the locations shown on the map based on the checklist date."
+                help="Filter the locations shown on the map based on the checklist date"
             )
             
         with ctrl_col2:
@@ -425,16 +448,6 @@ if uploaded_files:
             
         # B. Apply Cascading Content Type Filters
         if not df_map.empty:
-            def determine_icon_group(row):
-                if pd.notna(row['Observation Details']) and str(row['Observation Details']).strip() != "":
-                    if contains_coordinates(row['Observation Details']):
-                        return 'compass'
-                    return 'comment'
-                return 'media_or_blank'
-
-            # Tag each row with its respective map icon classification
-            df_map['icon_group'] = df_map.apply(determine_icon_group, axis=1)
-            
             # Apply strict hierarchy based on checkbox states
             if show_compass:
                 # If compass is checked, show ONLY compass markers
