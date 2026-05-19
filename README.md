@@ -3,10 +3,15 @@
 ## Overview
 
 Meadowlark is designed to help you find your next target species using observation data from the Macaulay Library. It parses high-quality checklists with media and comments, presenting recency and location data in a more accessible way than a regular eBird search. It is meant to quickly help find answers to questions like:
-"Where has this bird been photographed most recently/reliably?" ,
-"Is it worth chasing for photos, or is a scope required?" ,
-"What time of year should I go?",
+
+"Where has this bird been photographed most recently/reliably?"
+
+"Is it worth chasing for photos, or is a scope required?"
+
+"What time of year should I go?"
+
 and
+
 "Just gimme the coordinates!"
 
 ## Features
@@ -22,21 +27,16 @@ and
 3. **Interactive Map**
    - Uses **Folium** for interactive map visualization.
    - **Color-coded markers and clusters** based on checklist recency:
-     - ≤7 days: <span style="color:red">Red</span>
-     - 8–30 days: <span style="color:orange">Orange</span>
-     - 31–90 days: <span style="color:green">Green</span>
-     - \>90 days: <span style="color:blue">Blue</span>
+     - 🔴 ≤7 days
+     - 🟠 8–30 days
+     - 🟢 31–90 days
+     - 🔵 \>90 days
    - **Marker Icons** for highlighting comments and media types:
-
-     <img src="https://raw.githubusercontent.com/FortAwesome/Font-Awesome/7.x/svgs/solid/compass.svg" width="15" height="15"> Comment with Coordinates
-
-     <img src="https://raw.githubusercontent.com/FortAwesome/Font-Awesome/7.x/svgs/solid/comment.svg" width="15" height="15"> Comment
-
-     <img src="https://raw.githubusercontent.com/FortAwesome/Font-Awesome/7.x/svgs/solid/camera.svg" width="15" height="15"> Photo
-
-     <img src="https://raw.githubusercontent.com/FortAwesome/Font-Awesome/7.x/svgs/solid/video-camera.svg" width="15" height="15"> Video
-
-     <img src="https://raw.githubusercontent.com/FortAwesome/Font-Awesome/7.x/svgs/solid/volume-high.svg" width="15" height="15"> Audio   
+     - 🧭 Comment with Coordinates
+     - 💬 Comment
+     - 📷 Photo
+     - 📹 Video
+     - 🔊 Audio   
    - **Marker Filters**
      - Filter the locations shown on the map based on the checklist date.
      - Show only checklists with comments, or coordinates in the comments. 
@@ -54,7 +54,7 @@ and
 5. Click the 'Export' button at the upper right of the page to download the CSV file
 6. Upload to Meadowlark
 
-\* Being signed into eBird allows retrieval of up to 10,000 rows. Otherwise, it is limited to~ 30.
+\* Being signed into eBird allows retrieval of up to 10,000 rows. Otherwise, it is limited to ~ 30.
 
 ## Demo
 
