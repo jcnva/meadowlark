@@ -241,43 +241,9 @@ if uploaded_files:
         st.error(str(e))
         st.stop()
 
-    # --- 4. Render Metrics & Widgets ---
+    # --- 4. Render Metrics ---
     st.sidebar.metric("Total Media Assets", len(df_full))
     st.sidebar.metric("Unique Checklists", len(df_unique))
-    st.sidebar.subheader("Map Controls")
-    st.sidebar.select_slider(
-        "Display Markers by Recency",
-        options=recency_options,
-        key="map_recency",
-        help="Filter the locations shown on the map based on the checklist date."
-    )
-
-    # 1. Initialize session states if they don't exist yet
-    if "sidebar_compass" not in st.session_state:
-        st.session_state.sidebar_compass = False
-    if "sidebar_comments" not in st.session_state:
-        st.session_state.sidebar_comments = False
-
-    # 2. Callback: If compass is checked, automatically check comments
-    def handle_compass_change():
-        if st.session_state.sidebar_compass:
-            st.session_state.sidebar_comments = True
-
-    # 3. Render Compass checkbox first
-    show_compass = st.sidebar.checkbox(
-        "🧭 Coordinates", 
-        key="sidebar_compass",
-        help='Show only checklists with coordinates in the comments',
-        on_change=handle_compass_change
-    )
-
-    # 4. Render Comments checkbox (disabled and forced to True if compass is checked)
-    show_comments = st.sidebar.checkbox(
-        "💬 Comments", 
-        key="sidebar_comments",
-        help='Show only checklists with comments',
-        disabled=show_compass
-    )
 
 # --- 5. Main Content Area ---
     st.header(df_full['Common Name'].iloc[0], anchor=False)
@@ -306,7 +272,7 @@ if uploaded_files:
             st.dataframe(
                 styled_df,
                 hide_index=True,
-                height=527,
+                height=555,
                 selection_mode="multi-row",
                 on_select="rerun",
                 key="loc_table",
@@ -326,7 +292,7 @@ if uploaded_files:
                         width="large"
                     )
                 },
-                width = 'stretch'
+                width='stretch'
             )
         else:
             st.warning("No checklists to display for the selected data.")
@@ -409,6 +375,44 @@ if uploaded_files:
     # --- Map ---
     with map_col:
         
+        # 1. Initialize session states if they don't exist yet
+        if "map_compass" not in st.session_state:
+            st.session_state.map_compass = False
+        if "map_comments" not in st.session_state:
+            st.session_state.map_comments = False
+
+        # 2. Callback: If compass is checked, automatically check comments
+        def handle_compass_change():
+            if st.session_state.map_compass:
+                st.session_state.map_comments = True
+
+        # --- Map Controls ---
+        ctrl_col1, ctrl_col2, ctrl_col3 = st.columns([5, 1, 1], vertical_alignment="bottom")
+        
+        with ctrl_col1:
+            st.select_slider(
+                "Display Markers by Recency",
+                options=recency_options,
+                key="map_recency",
+                help="Filter the locations shown on the map based on the checklist date."
+            )
+            
+        with ctrl_col2:
+            show_compass = st.checkbox(
+                "🧭", 
+                key="map_compass",
+                help='Show only checklists with coordinates in the comments',
+                on_change=handle_compass_change
+            )
+            
+        with ctrl_col3:
+            show_comments = st.checkbox(
+                "💬", 
+                key="map_comments",
+                help='Show only checklists with comments',
+                disabled=show_compass
+            )
+
         # A. Apply Slider Filter for Map bounds
         if st.session_state.map_recency == "Past 7 Days":
             df_map = df_filtered[df_filtered['Date_obj'] >= (now - pd.Timedelta(days=7))].copy()
@@ -549,10 +553,10 @@ if uploaded_files:
         # Map Legend
         legend_html = """
         <div style="display:flex; gap:15px; margin-bottom:10px;">
-            <div style="background-color:#e74c3c; width:20px; height:20px; display:inline-block;"></div> ≤ 7 days
-            <div style="background-color:#f39c12; width:20px; height:20px; display:inline-block;"></div> 8–30 days
-            <div style="background-color:#27ae60; width:20px; height:20px; display:inline-block;"></div> 31–90 days
-            <div style="background-color:#3498db; width:20px; height:20px; display:inline-block;"></div> > 90 days
+        🔴 ≤7 days
+        🟠 8–30 days
+        🟢 31–90 days
+        🔵 >90 days
         </div>
         """
         st.markdown(legend_html, unsafe_allow_html=True)
@@ -561,7 +565,7 @@ if uploaded_files:
             st_folium(
                 render_map(df_map), 
                 width="100%",
-                height=550,
+                height=500,
                 key="bird_map_v14",
                 returned_objects=[]
             )
