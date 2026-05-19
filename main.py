@@ -19,7 +19,7 @@ Upload your Macaulay Library Catalog File here.
 5. Click the 'Export' button at the upper right of the page to download the CSV file.
 6. Upload the CSV file here.
 
-\* Being signed into eBird allows retrieval of up to 10,000 rows. Otherwise, it is limited to ~ 30.
+\\* Being signed into eBird allows retrieval of up to 10,000 rows. Otherwise, it is limited to ~ 30.
 """
 
 txt_table = """
