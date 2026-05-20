@@ -23,8 +23,10 @@ Upload your Macaulay Library Catalog File here.
 """
 
 txt_table = """
-This table displays all localities sorted by Date. It can be also be sorted by Checklist count.
-To zoom into a specific locality on the map, select the checkbox to the left of it.
+This table displays all localities sorted by their most recent checklist.
+It can be also be sorted by total checklist count.
+Selecting the checkbox to the left of a row will zoom into that locality on the map
+as well as update the charts to reflect only that locality. Multiple rows can be selected.
 """
 
 txt_chart1 = (
@@ -47,12 +49,20 @@ DMS_PATTERN = re.compile(
     re.VERBOSE | re.IGNORECASE,
 )
 
+GOOGLE_MAPS_SHORT_URL_PATTERN = re.compile(
+    r"https?://maps\.app\.goo\.gl/[A-Za-z0-9_-]",
+    re.IGNORECASE,
+)
+
 def contains_coordinates(text):
     if pd.isna(text):
         return False
     text = str(text)
-    return bool(DECIMAL_PATTERN.search(text) or DMS_PATTERN.search(text))
-
+    return bool(
+        DECIMAL_PATTERN.search(text)
+        or DMS_PATTERN.search(text)
+        or GOOGLE_MAPS_SHORT_URL_PATTERN.search(text)
+    )
 
 # --- Page Config ---
 st.set_page_config(
@@ -375,20 +385,18 @@ if uploaded_files:
     # --- Map ---
     with map_col:
         
-        # 1. Initialize session states if they don't exist yet
-        if "map_compass" not in st.session_state:
-            st.session_state.map_compass = False
-        if "map_comments" not in st.session_state:
-            st.session_state.map_comments = False
+        # Initialize session state for the unified multi-select pill group
+        if "map_filters_pill" not in st.session_state:
+            st.session_state.map_filters_pill = []
 
-        # 2. Callback: If compass is checked, automatically check comments
-        def handle_compass_change():
-            if st.session_state.map_compass:
-                st.session_state.map_comments = True
+        # Read active states directly out of the list
+        show_compass = "🧭" in st.session_state.map_filters_pill
+        show_comments = "💬" in st.session_state.map_filters_pill
 
-        # Checkbox Slider Auto-Expand Logic
-        compass_toggled_on = st.session_state.get("map_compass") and not st.session_state.get("prev_map_compass", False)
-        comments_toggled_on = st.session_state.get("map_comments") and not st.session_state.get("prev_map_comments", False)
+        # Pill Slider Auto-Expand Logic
+        prev_filters = st.session_state.get("prev_map_filters_pill", [])
+        compass_toggled_on = show_compass and ("🧭" not in prev_filters)
+        comments_toggled_on = show_comments and ("💬" not in prev_filters)
         
         cb_subset = None
         if compass_toggled_on:
@@ -405,35 +413,29 @@ if uploaded_files:
             if recency_weights[required_recency_cb] > recency_weights[current_recency]:
                 st.session_state.map_recency = required_recency_cb
 
-        # Save current state for next run to ensure we only bump up on the initial click
-        st.session_state.prev_map_compass = st.session_state.get("map_compass", False)
-        st.session_state.prev_map_comments = st.session_state.get("map_comments", False)
+        # Keep state updated for the next rerun comparison
+        st.session_state.prev_map_filters_pill = st.session_state.map_filters_pill
 
         # --- Map Controls ---
-        ctrl_col1, ctrl_col2, ctrl_col3 = st.columns([5, 1, 1], vertical_alignment="bottom")
+        ctrl_col1, ctrl_col2 = st.columns([5, 2], vertical_alignment="bottom")
         
         with ctrl_col1:
             st.select_slider(
                 "Show Checklists by Recency",
                 options=recency_options,
                 key="map_recency",
-                help="Filter the locations shown on the map based on the checklist date"
+                label_visibility="collapsed",
+                help="Filter the locations shown on the map based on the checklist recency"
             )
             
         with ctrl_col2:
-            show_compass = st.checkbox(
-                "🧭", 
-                key="map_compass",
-                help='Show only checklists with coordinates in the comments',
-                on_change=handle_compass_change
-            )
-            
-        with ctrl_col3:
-            show_comments = st.checkbox(
-                "💬", 
-                key="map_comments",
-                help='Show only checklists with comments',
-                disabled=show_compass
+            st.pills(
+                "Filters",
+                options=["🧭", "💬"],
+                selection_mode="multi",
+                key="map_filters_pill",
+                label_visibility="collapsed",
+                help="🧭: Show only checklists with coordinates in comments | 💬: Show only checklists with comments"
             )
 
         # A. Apply Slider Filter for Map bounds
@@ -446,16 +448,16 @@ if uploaded_files:
         else:
             df_map = df_filtered.copy()
             
-        # B. Apply Cascading Content Type Filters
+        # B. Robust Cascading Content Type Filters
         if not df_map.empty:
-            # Apply strict hierarchy based on checkbox states
-            if show_compass:
-                # If compass is checked, show ONLY compass markers
+            if "🧭" in st.session_state.map_filters_pill:
+                # Top priority: If compass is active, filter strictly to compass rows.
+                # Deselecting 'comments' keeps this condition true, so the map won't alter or reset.
                 df_map = df_map[df_map['icon_group'] == 'compass']
-            elif show_comments:
-                # If comments is checked (and compass is not), show ONLY comment and compass markers
+            elif "💬" in st.session_state.map_filters_pill:
+                # Lower priority: Only comments is active, show both comments and compass rows.
                 df_map = df_map[df_map['icon_group'].isin(['comment', 'compass'])]
-            # If neither is checked, df_map remains untouched and displays all rows
+            # Default: If nothing is selected, df_map passes through unchanged (displays all rows).
             
         def render_map(data):
 
@@ -592,7 +594,7 @@ if uploaded_files:
             st_folium(
                 render_map(df_map), 
                 width="100%",
-                height=500,
+                height=525,
                 key="bird_map_v14",
                 returned_objects=[]
             )
