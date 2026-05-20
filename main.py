@@ -553,8 +553,11 @@ if uploaded_files:
                 
                 popup_media_html = ""
                 tooltip_media_html = ""
-                
-                time_str = str(int(float(row.Time))).zfill(4)
+
+                if pd.notna(row.Time):
+                    time_str = str(int(float(row.Time))).zfill(4)
+                else:
+                    time_str = '0000'
                 formatted_time = f"{time_str[:-2]}:{time_str[-2:]}"
 
                 if pd.notna(catalog_id) and str(catalog_id).strip():
