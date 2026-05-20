@@ -145,7 +145,23 @@ def load_data(files):
     # Remove rows without coordinates
     df = df[df['Latitude'].notna() & df['Longitude'].notna()]
 
-    # Convert Date column to datetime
+    # --- Date Fallback Logic ---
+    # Create safe string representations, defaulting missing Months/Days to 1
+    years = df['Year'].fillna(0).astype(int).astype(str)
+    months = df['Month'].fillna(1).astype(int).astype(str).str.zfill(2)
+    days = df['Day'].fillna(1).astype(int).astype(str).str.zfill(2)
+
+    # Construct the fallback YYYY-MM-DD strings
+    fallback_strings = years + "-" + months + "-" + days
+
+    # Convert to datetime objects (invalid dates will coerce to NaT)
+    fallback_dates = pd.to_datetime(fallback_strings, errors='coerce')
+
+    # Fill missing Dates using the fallback, but strictly only where a Year exists
+    df['Date'] = df['Date'].fillna(fallback_dates.where(df['Year'].notna()))
+
+    # Convert Date column to datetime (just to be safe) and duplicate to Date_obj
+    df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
     df['Date_obj'] = df['Date']
 
     # Sanitize backticks to prevent JavaScript crashes
