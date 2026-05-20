@@ -49,8 +49,33 @@ DMS_PATTERN = re.compile(
     re.VERBOSE | re.IGNORECASE,
 )
 
-GOOGLE_MAPS_SHORT_URL_PATTERN = re.compile(
-    r"https?://maps\.app\.goo\.gl/[A-Za-z0-9_-]",
+DDM_PATTERN = re.compile(
+    r"\d{1,3}[°º]\s*\d{1,2}\.\d+['′]?\s*[NSEW]",
+    re.VERBOSE | re.IGNORECASE,
+)
+
+UTM_PATTERN = re.compile(
+    r"\b(?:[1-9]|[1-5]\d|60)\s*[C-X]\s+\d{6}\s+\d{7}\b",
+    re.IGNORECASE,
+)
+
+GOOGLE_MAPS_PATTERN = re.compile(
+    r"https?://(?:maps\.app\.goo\.gl|(?:\w+\.)?google\.com/maps|maps\.google\.com)",
+    re.IGNORECASE,
+)
+
+APPLE_MAPS_PATTERN = re.compile(
+    r"https?://maps\.apple\.com",
+    re.IGNORECASE,
+)
+
+PLUS_CODE_PATTERN = re.compile(
+    r"\b[23456789CFGHJMPQRVWX]{4,8}\+[23456789CFGHJMPQRVWX]{2,}\b",
+    re.IGNORECASE,
+)
+
+W3W_PATTERN = re.compile(
+    r"(?:/{3}|https?://w3w\.co/)[A-Za-z]+\.[A-Za-z]+\.[A-Za-z]+",
     re.IGNORECASE,
 )
 
@@ -61,7 +86,12 @@ def contains_coordinates(text):
     return bool(
         DECIMAL_PATTERN.search(text)
         or DMS_PATTERN.search(text)
-        or GOOGLE_MAPS_SHORT_URL_PATTERN.search(text)
+        or DDM_PATTERN.search(text)
+        or UTM_PATTERN.search(text)
+        or GOOGLE_MAPS_PATTERN.search(text)
+        or APPLE_MAPS_PATTERN.search(text)
+        or PLUS_CODE_PATTERN.search(text)
+        or W3W_PATTERN.search(text)
     )
 
 # --- Page Config ---
@@ -125,14 +155,27 @@ def load_data(files):
     # Remove duplicate catalog assets across files
     df = df.drop_duplicates(subset=["ML Catalog Number"])
 
-    # Extract unique checklists
-    df_unique = (
-        df
-        .sort_values(
+    def get_format_emojis(formats):
+        f_set = set(formats.dropna())
+        return (
+            ("📷 " if "Photo" in f_set else "") +
+            ("📹 " if "Video" in f_set else "") +
+            ("🔊 " if "Audio" in f_set else "")
+        ).strip()
+
+    # Robust grouping key: Fall back to ML Catalog Number if Checklist ID is NaN
+    group_key = df['eBird Checklist ID'].fillna(df['ML Catalog Number'])
+    df['Media_Emojis'] = df.groupby(group_key)['Format'].transform(get_format_emojis)
+    df_nan = df[df['eBird Checklist ID'].isna()]
+
+    # CRITICAL FIX: Standard drop_duplicates would throw away all but the first NaN row.
+    # We separate them, drop duplicates on valid IDs, and combine them back.
+    df_nan = df[df['eBird Checklist ID'].isna()]
+    df_valid = df[df['eBird Checklist ID'].notna()].drop_duplicates(subset=['eBird Checklist ID'])
+    df_unique = pd.concat([df_valid, df_nan], ignore_index=True)
+    df_unique = df_unique.sort_values(
             by=['Date_obj', 'Time', 'eBird Checklist ID', 'Average Community Rating'],
             ascending=[True, True, True, False]
-        )
-        .drop_duplicates(subset=['eBird Checklist ID'])
     )
 
     # Vectorize marker categorization
@@ -431,11 +474,11 @@ if uploaded_files:
         with ctrl_col2:
             st.pills(
                 "Filters",
-                options=["🧭", "💬"],
+                options=["💬", "🧭"],
                 selection_mode="multi",
                 key="map_filters_pill",
                 label_visibility="collapsed",
-                help="🧭: Show only checklists with coordinates in comments | 💬: Show only checklists with comments"
+                help="💬: Show only checklists with comments | 🧭: Show only checklists with coordinates in comments "
             )
 
         # A. Apply Slider Filter for Map bounds
@@ -511,6 +554,9 @@ if uploaded_files:
                 popup_media_html = ""
                 tooltip_media_html = ""
                 
+                time_str = str(int(float(row.Time))).zfill(4)
+                formatted_time = f"{time_str[:-2]}:{time_str[-2:]}"
+
                 if pd.notna(catalog_id) and str(catalog_id).strip():
                     thumbnail_url = f"https://cdn.download.ams.birds.cornell.edu/api/v2/asset/{catalog_id}"
                     
@@ -524,7 +570,13 @@ if uploaded_files:
                         popup_media_html = f"<video controls poster='{thumbnail_url}/mp4/1280' style='width: 160px; border-radius: 8px; margin-bottom: 8px;'><source src='{thumbnail_url}/mp4/1280'>Your browser does not support video.</video><br>"
                         tooltip_media_html = f"<img src='{thumbnail_url}/160' style='width: 160px; border-radius: 8px; margin-bottom: 8px;' ><br>"
 
-                checklist_url = f"https://ebird.org/checklist/{row.eBird_Checklist_ID}"
+                if pd.notna(row.eBird_Checklist_ID):
+                    cl_url = f"https://ebird.org/checklist/{row.eBird_Checklist_ID}"
+                    cl_txt = row.eBird_Checklist_ID
+                else:
+                    cl_url = f"https://macaulaylibrary.org/asset/{row.ML_Catalog_Number}"
+                    cl_txt = f"ML{row.ML_Catalog_Number}"
+
                 observation_details = ""
 
                 if pd.notna(row.Observation_Details):
@@ -552,9 +604,11 @@ if uploaded_files:
                     <b style="font-size: 14px;">{row.Common_Name}</b><br>
                     <b>Locality:</b> {row.Locality}<br>
                     <b>Date:</b> {row.Date}<br>
+                    <b>Time:</b> {formatted_time}<br>
                     {observation_details}
-                    <a href="{checklist_url}" target="_blank" style="color: #2E86C1; font-weight: bold;">
-                        {row.eBird_Checklist_ID}
+                    {row.Media_Emojis}<br>
+                    <a href="{cl_url}" target="_blank" style="color: #2E86C1; font-weight: bold;">
+                        {cl_txt}
                     </a>
                 </div>
                 """
@@ -565,6 +619,8 @@ if uploaded_files:
                     <b style="font-size: 14px;">{row.Common_Name}</b><br>
                     <b>Locality:</b> {row.Locality}<br>
                     <b>Date:</b> {row.Date}<br>
+                    <b>Time:</b> {formatted_time}<br>
+                    {row.Media_Emojis}
                 </div>
                 """
 
