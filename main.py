@@ -445,15 +445,16 @@ if uploaded_files:
     with map_col:
         
         # Initialize session state for the unified multi-select pill group
+        # Media options ON by default, Comments and Coordinates OFF by default
         if "map_filters_pill" not in st.session_state:
-            st.session_state.map_filters_pill = []
+            st.session_state.map_filters_pill = ["🔊", "📹", "📷"]
 
         # Read active states directly out of the list
         show_compass = "🧭" in st.session_state.map_filters_pill
         show_comments = "💬" in st.session_state.map_filters_pill
 
         # Pill Slider Auto-Expand Logic
-        prev_filters = st.session_state.get("prev_map_filters_pill", [])
+        prev_filters = st.session_state.get("prev_map_filters_pill", ["🔊", "📹", "📷"])
         compass_toggled_on = show_compass and ("🧭" not in prev_filters)
         comments_toggled_on = show_comments and ("💬" not in prev_filters)
         
@@ -476,7 +477,7 @@ if uploaded_files:
         st.session_state.prev_map_filters_pill = st.session_state.map_filters_pill
 
         # --- Map Controls ---
-        ctrl_col1, ctrl_col2 = st.columns([5, 2], vertical_alignment="bottom")
+        ctrl_col1, ctrl_col2 = st.columns([5, 4], vertical_alignment="bottom")
         
         with ctrl_col1:
             st.select_slider(
@@ -490,11 +491,11 @@ if uploaded_files:
         with ctrl_col2:
             st.pills(
                 "Filters",
-                options=["💬", "🧭"],
+                options=["🔊", "📹", "📷", "💬", "🧭"],
                 selection_mode="multi",
                 key="map_filters_pill",
                 label_visibility="collapsed",
-                help="💬: Show only checklists with comments | 🧭: Show only checklists with coordinates in comments "
+                help="🔊: Audio | 📹: Videos | 📷: Photos | 💬: Show only checklists with comments | 🧭: Show only checklists with coordinates in comments"
             )
 
         # A. Apply Slider Filter for Map bounds
@@ -511,12 +512,24 @@ if uploaded_files:
         if not df_map.empty:
             if "🧭" in st.session_state.map_filters_pill:
                 # Top priority: If compass is active, filter strictly to compass rows.
-                # Deselecting 'comments' keeps this condition true, so the map won't alter or reset.
+                # All other pills are ignored.
                 df_map = df_map[df_map['icon_group'] == 'compass']
-            elif "💬" in st.session_state.map_filters_pill:
-                # Lower priority: Only comments is active, show both comments and compass rows.
-                df_map = df_map[df_map['icon_group'].isin(['comment', 'compass'])]
-            # Default: If nothing is selected, df_map passes through unchanged (displays all rows).
+            else:
+                # 1. Media Filters (OR logic)
+                selected_media = [pill for pill in ["🔊", "📹", "📷"] if pill in st.session_state.map_filters_pill]
+                
+                if not selected_media:
+                    # If no media types are selected, show nothing
+                    df_map = df_map.iloc[0:0]
+                elif len(selected_media) < 3:
+                    # If 1 or 2 media types are selected, filter using OR logic over Media_Emojis
+                    pattern = '|'.join(selected_media)
+                    df_map = df_map[df_map['Media_Emojis'].str.contains(pattern, na=False)]
+                
+                # 2. Comments Filter (Cascading intersection)
+                if not df_map.empty and "💬" in st.session_state.map_filters_pill:
+                    # Lower priority: Comments is active, show only rows with comments (and compass rows)
+                    df_map = df_map[df_map['icon_group'].isin(['comment', 'compass'])]
             
         def render_map(data):
 

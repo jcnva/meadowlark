@@ -36,6 +36,7 @@ and
      - Instantly view checklist details with a mouse hover or click. 
    - **Marker Filters**
      - Filter the locations shown on the map based on the checklist recency.
+     - Filter by media type: Photo 📷, Video 📹, or Audio 🔊.
      - Show only checklists with Comments 💬, or Comments with Coordinates 🧭. 
 
 3. **Activity by Location Table**
