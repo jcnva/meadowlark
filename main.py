@@ -23,10 +23,10 @@ Upload your Macaulay Library Catalog File here.
 """
 
 txt_table = """
-This table displays all locations sorted by their most recent checklist.
-It can be also be sorted by total checklist count.
-Selecting the checkbox to the left of a row will zoom into that location on the map
-as well as update the charts to reflect only that location. Multiple rows can be selected.
+This table lists all locations and is sorted by the date of the most recent checklist by default.
+You can also sort the table by the total number of checklists.
+Select the checkbox next to a location to zoom to it on the map and update the charts to display data for that location only.
+Multiple locations can be selected at the same time.
 """
 
 txt_chart1 = (
@@ -388,7 +388,7 @@ if uploaded_files:
     chart_col1, chart_col2 = st.columns(2)
 
     with chart_col2:
-        st.subheader("Observation History", help=txt_chart1, anchor=False)
+        st.subheader("Observation History", anchor=False)
 
         # Vectorized dt.normalize() is far faster than Python dt.date object extraction
         timeline_data = (
@@ -422,7 +422,7 @@ if uploaded_files:
         st.altair_chart(history_chart, width='stretch')
 
     with chart_col1:
-        st.subheader("Seasonal Activity", help=txt_chart2, anchor=False)
+        st.subheader("Seasonal Activity", anchor=False)
 
         def map_to_seasonal_calendar(dt):
             return dt.replace(year=2000)
@@ -620,7 +620,7 @@ if uploaded_files:
 
                 if pd.notna(row.Observation_Details):
                     observation_details = f"""
-                    <b>Observation Details:</b>
+                    <b>Comments:</b>
                     {row.Observation_Details}<br>
                     """
                     
@@ -641,9 +641,8 @@ if uploaded_files:
                 <div style="font-family: sans-serif; font-size: 12px;">
                     {popup_media_html}
                     <b style="font-size: 14px;">{row.Common_Name}</b><br>
-                    <b>Locality:</b> {row.Locality}<br>
-                    <b>Date:</b> {row.Date}<br>
-                    <b>Time:</b> {formatted_time}<br>
+                    <b>Location:</b> {row.Locality}<br>
+                    <b>Date:</b> {row.Date} {formatted_time}<br>
                     {observation_details}
                     {row.Media_Emojis}<br>
                     <a href="{cl_url}" target="_blank" style="color: #2E86C1; font-weight: bold;">
@@ -656,16 +655,15 @@ if uploaded_files:
                 <div style="font-family: sans-serif; font-size: 12px; width: 160px; white-space: normal">
                     {tooltip_media_html}
                     <b style="font-size: 14px;">{row.Common_Name}</b><br>
-                    <b>Locality:</b> {row.Locality}<br>
-                    <b>Date:</b> {row.Date}<br>
-                    <b>Time:</b> {formatted_time}<br>
+                    <b>Location:</b> {row.Locality}<br>
+                    <b>Date:</b> {row.Date} {formatted_time}<br>
                     {row.Media_Emojis}
                 </div>
                 """
 
                 folium.Marker(
                     location=[row.Latitude, row.Longitude],
-                    popup=folium.Popup(popup_html, max_width=160),
+                    popup=folium.Popup(popup_html, max_width=250),
                     tooltip=tooltip_html,
                     icon=folium.Icon(color=row.marker_color, icon=icon, prefix="fa"),
                     priority=row.priority,
